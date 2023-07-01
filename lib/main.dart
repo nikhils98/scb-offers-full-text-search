@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:scb_offers/local_storage.dart';
 
 import 'offer.dart';
 
@@ -34,7 +35,7 @@ class _ScbOffersState extends State<ScbOffers> {
             visualDensity: VisualDensity.adaptivePlatformDensity),
         home: Scaffold(
           body: Center(
-            child: FutureBuilder<List<Offer>>(
+              child: FutureBuilder<List<Offer>>(
             future: futureOffers,
             builder: (context, snapshot) {
               if (snapshot.hasData) {
@@ -50,6 +51,28 @@ class _ScbOffersState extends State<ScbOffers> {
 }
 
 Future<List<Offer>> fetchOffers() async {
+  var offers = await fetchOffersFromLocalStorage();
+
+  if (offers.isNotEmpty) {
+    return offers;
+  }
+
+  offers = await fetchOffersFromHttp();
+  LocalStorage.save('scb_offers', offers);
+  return offers;
+}
+
+Future<List<Offer>> fetchOffersFromLocalStorage() async {
+  final json = await LocalStorage.read('scb_offers');
+
+  if (json == null) {
+    return [];
+  }
+
+  return (json as List).map((item) => Offer.fromJson(item)).toList();
+}
+
+Future<List<Offer>> fetchOffersFromHttp() async {
   final response =
       await http.get(Uri.parse('https://www.sc.com/pk/data/tgl/offers.json'));
 
@@ -57,7 +80,6 @@ Future<List<Offer>> fetchOffers() async {
     throw Exception('Failed to load offers');
   }
 
-  final offersJson = jsonDecode(response.body)["offers"]["offer"] as List;
-
-  return offersJson.map((json) => Offer.fromJson(json)).toList();
+  final json = jsonDecode(response.body)["offers"]["offer"] as List;
+  return json.map((item) => Offer.fromJson(item)).toList();
 }
